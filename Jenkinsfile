@@ -9,9 +9,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                node {
-                    git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
-                }
+                git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
             }
         }
 
@@ -27,7 +25,7 @@ pipeline {
             steps {
                 script {
                     docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").inside {
-                        bat 'python -m pytest' // Replace with your test commands
+                        sh 'pytest' // Replace with your test commands
                     }
                 }
             }
@@ -36,8 +34,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    bat 'docker stop my-app-container || echo "Container not running"'
-                    bat 'docker rm my-app-container || echo "Container not found"'
+                    sh 'docker stop my-app-container || echo "Container not running"'
+                    sh 'docker rm my-app-container || echo "Container not found"'
 
                     docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").run(
                         "--name my-app-container -p 5000:5000 -d"
