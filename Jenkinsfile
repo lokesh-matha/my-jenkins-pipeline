@@ -29,20 +29,30 @@ pipeline {
             }
         }
 
-    stage('Build Docker Image') {
-        steps {
-            script {
-                bat '''
-                echo Building Docker image...
-                docker build -t %DOCKER_IMAGE%:%BUILD_ID% .
-                if errorlevel 1 (
-                    echo ERROR: Docker build failed
-                    exit /b 1
-                )
-                '''
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    bat '''
+                    echo Checking for existing image...
+                    docker images --format "{{.Tag}}" | find "%BUILD_ID%"
+                    if not errorlevel 1 (
+                        echo Image already exists for build %BUILD_ID%
+                        exit /b 0
+                    )
+
+                    echo Building new Docker image...
+                    docker build -t %DOCKER_IMAGE%:%BUILD_ID% .
+                    if errorlevel 1 (
+                        echo ERROR: Docker build failed
+                        exit /b 1
+                    )
+
+                    echo Tagging as latest...
+                    docker tag %DOCKER_IMAGE%:%BUILD_ID% %DOCKER_IMAGE%:latest
+                    '''
+                }
             }
         }
-    }
 
         stage('Push to Docker Hub') {
             steps {
@@ -53,12 +63,25 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
                         bat """
+                        echo Logging into Docker Hub...
                         echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+
+                        echo Pushing both tags...
                         docker push %DOCKER_IMAGE%:%BUILD_ID%
+                        docker push %DOCKER_IMAGE%:latest
                         """
                     }
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleanup completed"
+        }
+        success {
+            echo "Successfully pushed %DOCKER_IMAGE%:%BUILD_ID% and :latest"
         }
     }
 }
