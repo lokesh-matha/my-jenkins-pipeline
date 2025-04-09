@@ -7,21 +7,26 @@ pipeline {
         DOCKER_CREDENTIALS = 'docker-hub-creds'
     }
 
-    stages {
-        stage('Initialize') {
-            steps {
-                script {
-                    // Verify Jenkins can access Docker
-                    bat '''
-                    echo Checking Docker installation...
-                    docker --version || (
-                        echo ERROR: Docker not found in PATH
-                        exit /b 1
+    stage('Initialize Docker') {
+        steps {
+            script {
+                bat '''
+                echo Checking Docker status...
+                docker ps || (
+                    echo "Docker not responding - restarting Docker Desktop"
+                    taskkill /IM "Docker Desktop.exe" /F
+                    timeout /t 10
+                    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+                    timeout /t 30
+                    docker ps || (
+                        echo "Failed to start Docker"
+                        exit 1
                     )
-                    '''
-                }
+                )
+                '''
             }
         }
+    }
 
         stage('Verify Repository') {
             steps {
