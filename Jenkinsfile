@@ -9,51 +9,44 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
+                checkout scm
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
                 }
             }
         }
 
-        stage('Test') {
+        stage('Test Docker Image') {
             steps {
                 script {
-                    docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").inside {
-                        sh 'pytest || echo "Tests failed"'
+                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside {
+                        sh 'python -m pytest' // Replace with your test commands
                     }
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Push Docker Image') {
             steps {
                 script {
-                    sh 'docker stop my-app-container || echo "Container not running"'
-                    sh 'docker rm my-app-container || echo "Container not found"'
-
-                    docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").run(
-                        "--name my-app-container -p 5000:5000 -d"
-                    )
-
                     docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
-                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push()
-                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push('latest')
+                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
                     }
                 }
             }
         }
 
-        stage('Debug Docker') {
+        stage('Deploy Docker Container') {
             steps {
                 script {
-                    sh 'docker images'
-                    sh 'docker ps -a'
+                    sh 'docker stop my-app-container || true'
+                    sh 'docker rm my-app-container || true'
+                    sh "docker run --name my-app-container -p 5000:5000 -d ${DOCKER_IMAGE}:${DOCKER_TAG}"
                 }
             }
         }
@@ -61,10 +54,10 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline completed - cleaning up'
+            echo 'Pipeline finished'
         }
         success {
-            echo 'Deployed at http://localhost:5000'
+            echo 'Application deployed successfully!'
         }
         failure {
             echo 'Pipeline failed'
