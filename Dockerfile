@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Verify the application files
-RUN ["ls", "-la"]  # Debug: Show copied files
+# Verify the application files (corrected syntax)
+RUN ls -la  # Debug: Show copied files
 
 # Run the application
 CMD ["python", "app.py"]
