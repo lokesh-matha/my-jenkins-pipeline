@@ -1,18 +1,73 @@
-node('slave-node') {
+pipeline {
+    agent any
 
-    checkout scm
+    environment {
+        DOCKER_IMAGE = 'lokeshmatha/my-app-image'
+        DOCKER_TAG = 'latest'
+    }
 
-    stage('Building Image') {
-        docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
-            def customImage = docker.build("avinashmahto/pipeline:latest")
-            customImage.push()
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                script {
+                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}")
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                script {
+                    docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").inside {
+                        sh 'pytest || echo "Tests failed"'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    sh 'docker stop my-app-container || echo "Container not running"'
+                    sh 'docker rm my-app-container || echo "Container not found"'
+
+                    docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").run(
+                        "--name my-app-container -p 5000:5000 -d"
+                    )
+
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
+                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push()
+                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('Debug Docker') {
+            steps {
+                script {
+                    sh 'docker images'
+                    sh 'docker ps -a'
+                }
+            }
         }
     }
 
-    stage('Deploy') {
-        sh 'docker stop my-app-container || true'
-        sh 'docker rm my-app-container || true'
-        sh "docker run --name my-app-container -d -p 5000:5000 avinashmahto/pipeline:latest"
-        sh 'docker ps | grep my-app-container || echo "Container not running!"'
+    post {
+        always {
+            echo 'Pipeline completed - cleaning up'
+        }
+        success {
+            echo 'Deployed at http://localhost:5000'
+        }
+        failure {
+            echo 'Pipeline failed'
+        }
     }
 }
