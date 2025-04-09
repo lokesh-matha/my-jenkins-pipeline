@@ -1,38 +1,54 @@
 pipeline {
     agent any
-    environment {
-        DOCKER_IMAGE = 'lokeshmatha/node-ci-cd-demo'
-        DOCKER_TAG = 'latest'
-    }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/lokeshmatha/my-jenkins-pipeline'
+                git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
             }
         }
-        stage('Build Docker Image') {
+
+        stage('Build') {
             steps {
                 script {
-                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                    docker.build("my-app-image:${env.BUILD_ID}")
                 }
             }
         }
+
         stage('Test') {
             steps {
-                sh 'echo "Running tests..."'
-                // Example: sh 'npm test' or './gradlew test'
+                script {
+                    docker.image("my-app-image:${env.BUILD_ID}").inside {
+                        bat 'python -m pytest'  // Windows uses bat instead of sh
+                    }
+                }
             }
         }
+
         stage('Deploy') {
             steps {
                 script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
-                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                    }
-                    // Optional: Deploy to a server
-                    sh "docker run -d -p 8081:80 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                    bat 'docker stop my-app-container || echo "Container not running"'
+                    bat 'docker rm my-app-container || echo "Container not found"'
+                    
+                    docker.image("my-app-image:${env.BUILD_ID}").run(
+                        "--name my-app-container -p 5000:5000 -d"
+                    )
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline completed - cleaning up'
+        }
+        success {
+            echo 'Deployed at http://localhost:5000'
+        }
+        failure {
+            echo 'Pipeline failed'
         }
     }
 }
