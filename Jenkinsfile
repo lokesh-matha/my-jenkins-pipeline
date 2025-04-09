@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_REGISTRY = 'docker.io'
         DOCKER_IMAGE = 'lokeshmatha/my-app-image'
-        DOCKER_CREDENTIALS = 'docker-hub-credentials'
+        DOCKER_CREDENTIALS = 'docker-hub'
     }
 
     stages {
