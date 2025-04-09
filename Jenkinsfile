@@ -1,76 +1,53 @@
 pipeline {
     agent any
-
     environment {
         DOCKER_IMAGE = 'lokeshmatha/my-app-image'
-        DOCKER_REGISTRY = 'docker.io'
         DOCKER_CREDENTIALS = 'docker-hub'
+        // Use timestamp for unique but readable tags
+        IMAGE_TAG = "${env.BUILD_ID}-${new Date().format('yyyyMMddHHmm')}" 
     }
 
     stages {
-        stage('Initialize Docker') {
+        stage('Clean Previous') {
             steps {
                 script {
                     bat '''
-                    echo Checking Docker status...
-                    docker ps || (
-                        echo "Docker not responding - restarting Docker Desktop"
-                        taskkill /IM "Docker Desktop.exe" /F
-                        timeout /t 10
-                        start "" "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe"
-                        timeout /t 30
-                        docker ps || (
-                            echo "Failed to start Docker"
-                            exit 1
-                        )
-                    )
+                    echo Cleaning previous containers...
+                    docker stop my-app || echo "No container running"
+                    docker rm my-app || echo "No container to remove"
+                    
+                    echo Pruning unused images...
+                    docker image prune -f
                     '''
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build & Tag') {
             steps {
                 script {
-                    bat '''
-                    echo Checking for existing image...
-                    docker images --format "{{.Tag}}" | find "%BUILD_ID%"
-                    if not errorlevel 1 (
-                        echo Image already exists for build %BUILD_ID%
-                        exit /b 0
-                    )
-
-                    echo Building new Docker image...
-                    docker build -t %DOCKER_IMAGE%:%BUILD_ID% .
-                    if errorlevel 1 (
-                        echo ERROR: Docker build failed
-                        exit /b 1
-                    )
-
-                    echo Tagging as latest...
-                    docker tag %DOCKER_IMAGE%:%BUILD_ID% %DOCKER_IMAGE%:latest
-                    '''
+                    bat """
+                    echo Building new image...
+                    docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% -t %DOCKER_IMAGE%:latest .
+                    """
                 }
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push') {
             steps {
-                script {
-                    withCredentials([usernamePassword(
-                        credentialsId: env.DOCKER_CREDENTIALS,
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )]) {
-                        bat """
-                        echo Logging into Docker Hub...
-                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-
-                        echo Pushing both tags...
-                        docker push %DOCKER_IMAGE%:%BUILD_ID%
-                        docker push %DOCKER_IMAGE%:latest
-                        """
-                    }
+                withCredentials([usernamePassword(
+                    credentialsId: env.DOCKER_CREDENTIALS,
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    bat """
+                    echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                    echo Pushing versioned image...
+                    docker push %DOCKER_IMAGE%:%IMAGE_TAG%
+                    echo Pushing latest...
+                    docker push %DOCKER_IMAGE%:latest
+                    """
                 }
             }
         }
@@ -78,10 +55,12 @@ pipeline {
 
     post {
         always {
-            echo "Cleanup completed"
-        }
-        success {
-            echo "Successfully pushed %DOCKER_IMAGE%:%BUILD_ID% and :latest"
+            script {
+                bat '''
+                echo Final cleanup...
+                docker system prune -f
+                '''
+            }
         }
     }
 }
