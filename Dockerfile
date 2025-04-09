@@ -1,9 +1,9 @@
-FROM python:3.9-windowsservercore
+FROM python:3.9-slim
 
-WORKDIR C:/app
-COPY requirements.txt .
+WORKDIR /app
+
+COPY . .
+
 RUN pip install -r requirements.txt
-
-COPY app .
 
 CMD ["python", "app.py"]
