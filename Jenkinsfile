@@ -1,4 +1,13 @@
-node('slave-node') {
+pipeline {
+    agent any
+    stages {
+        stage('Test Git') {
+            steps {
+                bat 'git --version'
+            }
+        }
+    }
+}node('slave-node') {
 
     checkout scm
 
