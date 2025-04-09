@@ -60,7 +60,7 @@ pipeline {
                     )
 
                     // Push to Docker Hub with credentials
-                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
                         docker.image("${DOCKER_IMAGE}:${env.DOCKER_BUILD_TAG}").push()
                         docker.image("${DOCKER_IMAGE}:${env.DOCKER_BUILD_TAG}").push('latest')
                     }
