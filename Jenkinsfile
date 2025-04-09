@@ -16,7 +16,7 @@ pipeline {
                     echo "Docker not responding - restarting Docker Desktop"
                     taskkill /IM "Docker Desktop.exe" /F
                     timeout /t 10
-                    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+                    start "" "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe"
                     timeout /t 30
                     docker ps || (
                         echo "Failed to start Docker"
