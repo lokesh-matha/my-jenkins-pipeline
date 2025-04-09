@@ -1,15 +1,10 @@
 pipeline {
     agent any
 
-    // Required plugins declaration
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 30, unit: 'MINUTES')
-    }
-
     environment {
+        DOCKER_REGISTRY = 'docker.io'
         DOCKER_IMAGE = 'lokeshmatha/my-app-image'
-        DOCKER_HOST = 'tcp://localhost:2375'
+        DOCKER_CREDENTIALS = 'docker-hub-credentials'
     }
 
     stages {
@@ -19,16 +14,37 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    // Clean up any existing containers
-                    bat 'docker stop my-app-container || echo "No container to stop"'
-                    bat 'docker rm my-app-container || echo "No container to remove"'
+                    // Verify Dockerfile exists
+                    bat 'type Dockerfile || echo "Dockerfile not found"'
                     
-                    // Build with resource limits
-                    docker.build("${DOCKER_IMAGE}:${env.BUILD_ID}", 
-                        "--cpu-quota 100000 --memory 1G .")
+                    // Build with timestamp tag
+                    def timestamp = new Date().format('yyyyMMddHHmmss')
+                    docker.build("${DOCKER_IMAGE}:${timestamp}")
+                    env.DOCKER_TAG = timestamp
+                }
+            }
+        }
+
+        stage('Test Image') {
+            steps {
+                script {
+                    docker.image("${DOCKER_IMAGE}:${env.DOCKER_TAG}").inside {
+                        bat 'python -m pytest || echo "Tests failed"'
+                    }
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIALS) {
+                        docker.image("${DOCKER_IMAGE}:${env.DOCKER_TAG}").push()
+                        docker.image("${DOCKER_IMAGE}:${env.DOCKER_TAG}").push('latest')
+                    }
                 }
             }
         }
@@ -37,13 +53,13 @@ pipeline {
             steps {
                 script {
                     bat """
+                    docker stop my-app-container || echo "No container running"
+                    docker rm my-app-container || echo "No container to remove"
                     docker run \
                         --name my-app-container \
                         -p 5000:5000 \
-                        --cpus=1 \
-                        --memory=1g \
                         -d \
-                        ${DOCKER_IMAGE}:${env.BUILD_ID}
+                        ${DOCKER_IMAGE}:${env.DOCKER_TAG}
                     """
                 }
             }
@@ -52,10 +68,13 @@ pipeline {
 
     post {
         always {
-            echo 'Cleaning up...'
+            echo 'Cleanup...'
             script {
-                bat 'docker system prune -f || echo "Cleanup failed"'
+                bat 'docker system prune -f'
             }
+        }
+        success {
+            echo "Successfully deployed ${DOCKER_IMAGE}:${env.DOCKER_TAG}"
         }
     }
 }
