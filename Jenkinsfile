@@ -26,32 +26,25 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    try {
-                        // Windows-compatible build with logging
-                        bat '''
-                        echo Building Docker image...
-                        docker build --no-cache -t %DOCKER_IMAGE%:%BUILD_ID% . > docker-build.log 2>&1
-                        type docker-build.log
-                        '''
-                        
-                        // Verify image was created
-                        bat '''
-                        docker images | find "%DOCKER_IMAGE%:%BUILD_ID%"
-                        if errorlevel 1 (
-                            echo ERROR: Image not built successfully && exit /b 1
-                        )
-                        '''
-                    } catch (Exception e) {
-                        echo "Docker build failed: ${e.getMessage()}"
-                        bat 'if exist docker-build.log (type docker-build.log) else (echo No build log found)'
-                        error("Build failed")
-                    }
+    stage('Build Docker Image') {
+        steps {
+            script {
+                timeout(time: 10, unit: 'MINUTES') {
+                    bat """
+                    echo Building Docker image...
+                    docker build --no-cache -t %DOCKER_IMAGE%:%BUILD_ID% . > docker-build.log 2>&1
+                    type docker-build.log
+                    
+                    echo Verifying image exists...
+                    docker images | find "%DOCKER_IMAGE%"
+                    if errorlevel 1 (
+                        echo ERROR: Image not built && exit /b 1
+                    )
+                    """
                 }
             }
         }
+    }
 
         stage('Run Tests') {
             steps {
