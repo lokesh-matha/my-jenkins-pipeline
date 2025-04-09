@@ -2,7 +2,6 @@
 
 A CI/CD pipeline that automatically builds, tests, and deploys a Python Flask application using Jenkins and Docker.
 
-![Pipeline Diagram](https://example.com/pipeline-diagram.png) *(Replace with your actual diagram)*
 
 ## Features
 - 🚀 **Automated builds** on code push to GitHub
