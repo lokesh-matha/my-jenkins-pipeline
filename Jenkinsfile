@@ -9,7 +9,9 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
+                node {
+                    git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
+                }
             }
         }
 
@@ -25,7 +27,7 @@ pipeline {
             steps {
                 script {
                     docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").inside {
-                        bat 'python -m pytest' // Example: Replace with actual test commands
+                        bat 'python -m pytest' // Replace with your test commands
                     }
                 }
             }
