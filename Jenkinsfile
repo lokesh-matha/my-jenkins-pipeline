@@ -11,15 +11,15 @@ pipeline {
         stage('Verify Files') {
             steps {
                 script {
-                    // Verify critical files exist
+                    // Verify critical files exist (Windows compatible)
                     bat '''
-                    echo "Checking required files..."
-                    dir /b
+                    echo Checking required files...
+                    dir
                     if not exist requirements.txt (
-                        echo "ERROR: requirements.txt missing" && exit 1
+                        echo ERROR: requirements.txt missing && exit /b 1
                     )
                     if not exist app.py (
-                        echo "ERROR: app.py missing" && exit 1
+                        echo ERROR: app.py missing && exit /b 1
                     )
                     '''
                 }
@@ -30,15 +30,23 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Build with detailed logging
+                        // Windows-compatible build with logging
                         bat '''
-                        echo "Building Docker image..."
-                        docker build --no-cache -t %DOCKER_IMAGE%:%BUILD_ID% . 2>&1 | tee docker-build.log
+                        echo Building Docker image...
+                        docker build --no-cache -t %DOCKER_IMAGE%:%BUILD_ID% . > docker-build.log 2>&1
                         type docker-build.log
+                        '''
+                        
+                        // Verify image was created
+                        bat '''
+                        docker images | find "%DOCKER_IMAGE%:%BUILD_ID%"
+                        if errorlevel 1 (
+                            echo ERROR: Image not built successfully && exit /b 1
+                        )
                         '''
                     } catch (Exception e) {
                         echo "Docker build failed: ${e.getMessage()}"
-                        bat 'type docker-build.log || echo "No build log found"'
+                        bat 'if exist docker-build.log (type docker-build.log) else (echo No build log found)'
                         error("Build failed")
                     }
                 }
@@ -49,9 +57,10 @@ pipeline {
             steps {
                 script {
                     bat '''
-                    echo "Running container for tests..."
-                    docker run --rm %DOCKER_IMAGE%:%BUILD_ID% python -m pytest || (
-                        echo "Tests failed" && exit 1
+                    echo Running container for tests...
+                    docker run --rm %DOCKER_IMAGE%:%BUILD_ID% python -m pytest
+                    if errorlevel 1 (
+                        echo ERROR: Tests failed && exit /b 1
                     )
                     '''
                 }
@@ -67,10 +76,10 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
                         bat '''
-                        echo "Logging in to Docker Hub..."
+                        echo Logging in to Docker Hub...
                         echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
 
-                        echo "Tagging and pushing image..."
+                        echo Tagging and pushing image...
                         docker tag %DOCKER_IMAGE%:%BUILD_ID% %DOCKER_IMAGE%:latest
                         docker push %DOCKER_IMAGE%:%BUILD_ID%
                         docker push %DOCKER_IMAGE%:latest
@@ -86,8 +95,8 @@ pipeline {
             echo "Cleanup..."
             script {
                 bat '''
-                docker system prune -f || echo "Cleanup failed"
-                del docker-build.log 2>nul || echo "No log file to remove"
+                docker system prune -f
+                if exist docker-build.log del docker-build.log
                 '''
             }
         }
