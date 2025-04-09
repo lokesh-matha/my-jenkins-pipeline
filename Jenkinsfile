@@ -4,7 +4,11 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+<<<<<<< HEAD
                 git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline.git'
+=======
+                git branch: 'main', url: 'https://github.com/lokesh-matha/my-jenkins-pipeline'
+>>>>>>> origin/main
             }
         }
 
@@ -29,16 +33,25 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
+<<<<<<< HEAD
                     bat 'docker stop my-app-container || echo "Container not running"'
                     bat 'docker rm my-app-container || echo "Container not found"'
                     
                     docker.image("my-app-image:${env.BUILD_ID}").run(
                         "--name my-app-container -p 5000:5000 -d"
                     )
+=======
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
+                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                    }
+                    // Optional: Deploy to a server
+                    sh "docker run -d -p 8081:80 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+>>>>>>> origin/main
                 }
             }
         }
     }
+<<<<<<< HEAD
 
     post {
         always {
@@ -52,3 +65,6 @@ pipeline {
         }
     }
 }
+=======
+}
+>>>>>>> origin/main
