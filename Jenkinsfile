@@ -29,16 +29,20 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    bat """
-                    echo Building Docker image...
-                    docker build -t %DOCKER_IMAGE%:%BUILD_ID% .
-                    """
-                }
+    stage('Build Docker Image') {
+        steps {
+            script {
+                bat '''
+                echo Building Docker image...
+                docker build -t %DOCKER_IMAGE%:%BUILD_ID% .
+                if errorlevel 1 (
+                    echo ERROR: Docker build failed
+                    exit /b 1
+                )
+                '''
             }
         }
+    }
 
         stage('Push to Docker Hub') {
             steps {
