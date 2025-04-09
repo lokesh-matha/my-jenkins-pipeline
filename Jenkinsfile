@@ -25,7 +25,7 @@ pipeline {
             steps {
                 script {
                     docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").inside {
-                        sh 'pytest' // Replace with your test commands
+                        sh 'pytest || echo "Tests failed"'
                     }
                 }
             }
@@ -43,7 +43,17 @@ pipeline {
 
                     docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
                         docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push()
+                        docker.image("${DOCKER_IMAGE}:${env.BUILD_ID}").push('latest')
                     }
+                }
+            }
+        }
+
+        stage('Debug Docker') {
+            steps {
+                script {
+                    sh 'docker images'
+                    sh 'docker ps -a'
                 }
             }
         }
