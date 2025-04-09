@@ -2,38 +2,58 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = 'docker.io'
         DOCKER_IMAGE = 'lokeshmatha/my-app-image'
+        DOCKER_REGISTRY = 'docker.io'
         DOCKER_CREDENTIALS = 'docker-hub'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Verify Files') {
             steps {
-                checkout scm
+                script {
+                    // Verify critical files exist
+                    bat '''
+                    echo "Checking required files..."
+                    dir /b
+                    if not exist requirements.txt (
+                        echo "ERROR: requirements.txt missing" && exit 1
+                    )
+                    if not exist app.py (
+                        echo "ERROR: app.py missing" && exit 1
+                    )
+                    '''
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Verify Dockerfile exists
-                    bat 'type Dockerfile || echo "Dockerfile not found"'
-                    
-                    // Build with timestamp tag
-                    def timestamp = new Date().format('yyyyMMddHHmmss')
-                    docker.build("${DOCKER_IMAGE}:${timestamp}")
-                    env.DOCKER_TAG = timestamp
+                    try {
+                        // Build with detailed logging
+                        bat '''
+                        echo "Building Docker image..."
+                        docker build --no-cache -t %DOCKER_IMAGE%:%BUILD_ID% . 2>&1 | tee docker-build.log
+                        type docker-build.log
+                        '''
+                    } catch (Exception e) {
+                        echo "Docker build failed: ${e.getMessage()}"
+                        bat 'type docker-build.log || echo "No build log found"'
+                        error("Build failed")
+                    }
                 }
             }
         }
 
-        stage('Test Image') {
+        stage('Run Tests') {
             steps {
                 script {
-                    docker.image("${DOCKER_IMAGE}:${env.DOCKER_TAG}").inside {
-                        bat 'python -m pytest || echo "Tests failed"'
-                    }
+                    bat '''
+                    echo "Running container for tests..."
+                    docker run --rm %DOCKER_IMAGE%:%BUILD_ID% python -m pytest || (
+                        echo "Tests failed" && exit 1
+                    )
+                    '''
                 }
             }
         }
@@ -41,26 +61,21 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIALS) {
-                        docker.image("${DOCKER_IMAGE}:${env.DOCKER_TAG}").push()
-                        docker.image("${DOCKER_IMAGE}:${env.DOCKER_TAG}").push('latest')
-                    }
-                }
-            }
-        }
+                    withCredentials([usernamePassword(
+                        credentialsId: env.DOCKER_CREDENTIALS,
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        bat '''
+                        echo "Logging in to Docker Hub..."
+                        echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
 
-        stage('Deploy') {
-            steps {
-                script {
-                    bat """
-                    docker stop my-app-container || echo "No container running"
-                    docker rm my-app-container || echo "No container to remove"
-                    docker run \
-                        --name my-app-container \
-                        -p 5000:5000 \
-                        -d \
-                        ${DOCKER_IMAGE}:${env.DOCKER_TAG}
-                    """
+                        echo "Tagging and pushing image..."
+                        docker tag %DOCKER_IMAGE%:%BUILD_ID% %DOCKER_IMAGE%:latest
+                        docker push %DOCKER_IMAGE%:%BUILD_ID%
+                        docker push %DOCKER_IMAGE%:latest
+                        '''
+                    }
                 }
             }
         }
@@ -68,13 +83,13 @@ pipeline {
 
     post {
         always {
-            echo 'Cleanup...'
+            echo "Cleanup..."
             script {
-                bat 'docker system prune -f'
+                bat '''
+                docker system prune -f || echo "Cleanup failed"
+                del docker-build.log 2>nul || echo "No log file to remove"
+                '''
             }
-        }
-        success {
-            echo "Successfully deployed ${DOCKER_IMAGE}:${env.DOCKER_TAG}"
         }
     }
 }
