@@ -66,7 +66,19 @@ curl http://localhost:5000
 ├── Dockerfile            # Container setup
 └── tests/                # Unit tests
 ```
+## output
+```
+Go to the Jenkins server (or your local machine if you copy the JAR).
 
+Run this command:
+```bash
+
+java -jar C:\ProgramData\Jenkins\.jenkins\workspace\simple-java-app\target\hello-1.0.jar
+```
+
+This will execute your Java app and print the output (for example: Hello, World! if that’s what the app does).
+
+```
 ## Troubleshooting
 | Error | Solution |
 |-------|----------|
