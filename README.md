@@ -67,7 +67,6 @@ curl http://localhost:5000
 └── tests/                # Unit tests
 ```
 ## output
-```
 Go to the Jenkins server (or your local machine if you copy the JAR).
 
 Run this command:
@@ -78,7 +77,6 @@ java -jar C:\ProgramData\Jenkins\.jenkins\workspace\simple-java-app\target\hello
 
 This will execute your Java app and print the output (for example: Hello, World! if that’s what the app does).
 
-```
 ## Troubleshooting
 | Error | Solution |
 |-------|----------|
