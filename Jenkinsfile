@@ -3,7 +3,6 @@ pipeline {
     environment {
         DOCKER_IMAGE = 'lokeshmatha/my-app-image'
         DOCKER_CREDENTIALS = 'docker-hub'
-        // Use timestamp for unique but readable tags
         IMAGE_TAG = "${env.BUILD_ID}-${new Date().format('yyyyMMddHHmm')}" 
     }
 
@@ -47,6 +46,17 @@ pipeline {
                     docker push %DOCKER_IMAGE%:%IMAGE_TAG%
                     echo Pushing latest...
                     docker push %DOCKER_IMAGE%:latest
+                    """
+                }
+            }
+        }
+
+        stage('Deploy & Run') {
+            steps {
+                script {
+                    bat """
+                    echo Running Flask container...
+                    docker run -d --name my-app -p 5000:5000 %DOCKER_IMAGE%:latest
                     """
                 }
             }
