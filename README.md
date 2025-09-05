@@ -75,7 +75,7 @@ Run this command:
 java -jar C:\ProgramData\Jenkins\.jenkins\workspace\simple-java-app\target\hello-1.0.jar
 ```
 
-This will execute your Java app and print the output (for example: Hello, World! if that’s what the app does).
+This will execute your Java app and print the output .
 
 ## Troubleshooting
 | Error | Solution |
