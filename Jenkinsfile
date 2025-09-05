@@ -7,7 +7,29 @@ pipeline {
     }
 
     stages {
-        stage('Clean Previous') {
+        stage('Build Java App') {
+            steps {
+                script {
+                    bat '''
+                    echo ===== Building Java JAR =====
+                    mvn clean package
+                    '''
+                }
+            }
+        }
+
+        stage('Run Java App') {
+            steps {
+                script {
+                    bat '''
+                    echo ===== Running Java App =====
+                    java -jar target\\hello-1.0.jar
+                    '''
+                }
+            }
+        }
+
+        stage('Clean Previous Docker Containers') {
             steps {
                 script {
                     bat '''
@@ -22,18 +44,18 @@ pipeline {
             }
         }
 
-        stage('Build & Tag') {
+        stage('Build & Tag Flask Docker Image') {
             steps {
                 script {
                     bat """
-                    echo Building new image...
+                    echo ===== Building Flask Docker Image =====
                     docker build -t %DOCKER_IMAGE%:%IMAGE_TAG% -t %DOCKER_IMAGE%:latest .
                     """
                 }
             }
         }
 
-        stage('Push') {
+        stage('Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: env.DOCKER_CREDENTIALS,
@@ -51,11 +73,11 @@ pipeline {
             }
         }
 
-        stage('Deploy & Run') {
+        stage('Deploy & Run Flask App') {
             steps {
                 script {
                     bat """
-                    echo Running Flask container...
+                    echo ===== Deploying Flask Container =====
                     docker run -d --name my-app -p 5000:5000 %DOCKER_IMAGE%:latest
                     """
                 }
@@ -64,6 +86,11 @@ pipeline {
     }
 
     post {
+        success {
+            echo "✅ Build complete!"
+            echo "👉 Java JAR ran inside Jenkins (see logs above)."
+            echo "👉 Flask app available at: http://localhost:5000"
+        }
         always {
             script {
                 bat '''
